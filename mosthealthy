@@ -1,0 +1,251 @@
+from __future__ import division
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from pandas import DataFrame, Series
+from collections import Counter
+import xl
+import string
+
+path = r"""C:\Users\hmelberg_user\Google Drive\mosthealthy\\"""
+path = """C:\Users\hmelberg_user\Documents\data\meps\mepsmain\mepsnoyear\\"""
+
+# read data files function
+def read_columns(years, vars):
+    nan_values = {"age53x": [-1, -3]}
+    dfList = []
+    for i in years:
+        file = path + "meps" + str(i) + "r.csv"
+        print file
+        try:
+            dfTemp = pd.read_csv(file, sep=";", usecols = vars, na_values = nan_values)
+            dfTemp["year"] = i
+            if i == 1996:
+                dfTemp["panel"] = 1
+            dfList.append(dfTemp)
+            print ("yes")
+        except:
+            print ("no")
+    return dfList
+
+
+# create and define some key variables
+years = range(1996, 2011)
+path = """C:\Users\hmelberg_user\Documents\data\meps\mepsmain\mepsnoyear\\"""
+# read variables and create dataframe
+vars = ["dobyy", "dobmm", "age53x", "sex", "totexp", "dupersid", "panel", "perwtf"]
+path = """C:\Users\hmelberg_user\Documents\data\meps\mepsmain\mepsnoyear\\"""
+df_list = read_columns(years, vars)
+df = pd.concat(df_list, ignore_index=True)
+del df_list
+
+# import and merge variance estimation variables
+df_weights = pd.read_csv(path + "meps_csv_variance_r.csv", sep=";")
+df = pd.merge(df, df_weights, on = ["dupersid", "panel"])
+
+path = r"""C:\Users\hmelberg_user\Google Drive\mosthealthy\\"""
+
+# Convert to float data type and change decimal point from ',' to '.'
+f = lambda x: float(string.replace(str(x), u',', u'.'))
+df['perwtf'] = df['perwtf'].map(f)
+
+
+# Drop id na in age or toexp or ...
+df = df[df.dobyy.notnull()==1]
+df = df[df.totexp.notnull()==1]
+
+# data comparability - make -1 age missing, make all above 85 equal 85?
+df["age53x"][df.age53x > 85] = 85
+
+# create some useful variables
+df["age_groups_5"] = (df.age53x//5)*5           # age categories of five years, 0-4, 5-9 and so on)
+df["age_groups_10"] = (df.age53x//10)*10        # age categories of five years, 0-9, 10-19 and so on)
+df["totexp_groups_1000"] = (df.totexp//1000)*1000
+df["generation"]=df["dobyy"]
+#df["generation"] = df.year - df.age53x
+df["generation"].apply(int)
+
+df["age"] = df["year"] - df["dobyy"]
+df["agetest"]=df["age"] - df["age53x"]
+df["agetest"].value_counts()
+
+# Calculate expenditure, annual averages in different age groups - and weighted to correct for oversampling of some groups
+groups = ["year","generation"]
+grouped = df.groupby(groups)
+get_wavg = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+wavg = grouped.apply(get_wavg)
+
+# Organize the average expenditure generation/year information in a dataframe (df is individual level, enddf is year and generation level)
+enddf = DataFrame(wavg)
+enddf = enddf.reset_index()
+enddf["year_index"]=enddf["year"]
+enddf = enddf.rename(columns={0: "expenditure"})
+enddf["age"] = enddf["year"] - enddf["generation"]
+enddf["agetest"]=enddf["age"] - enddf["age53x"]
+enddf.dtypes
+
+# calculate best fit fifth order polynimial to predict expenditure for each generation each year 
+enddf["fit"] = enddf.generation[:]
+enddf["fit"] = enddf["fit"] + 0.0
+enddf.generation.value_counts().sort_index()
+
+
+for n in years:
+    x = enddf.generation[enddf.year==n]
+    y = enddf.expenditure[enddf.year==n]
+    coeff = np.polyfit(x, y, 5)
+    funct = np.poly1d(coeff)
+    enddf["fit"][enddf.year == n] = enddf["fit"][enddf.year == n].apply(funct)
+
+# calculate difference between best fit line and actual expenditures for each generation in each year 
+# may here also experiment with percentage difference (expenditure - fit)/fit, not absolute as used so far
+
+# negative value is good, less than expected health expense 
+enddf["diff"] = enddf["expenditure"] - enddf["fit"]  
+# absolute value of  difference
+enddf["abs_diff"] = abs(enddf["diff"])  
+# percentage difference, negative value is good, less than expected health expense        
+enddf["p_diff"] = enddf["diff"]/enddf["fit"]  
+
+
+# Some checks and plots
+enddf.head(25)
+enddf[enddf.year == 2002].plot(x = "age", y = ["expenditure", "fit"])
+plt.title('Average expected and actual health expenditure')
+plt.xlabel('Age')
+plt.ylabel('Dollars')
+plt.savefig(path + "2002HealthUs.png")
+plt.show()
+
+for year in range(2000,2011):
+    enddf[enddf.year == year].plot(x = "age", y = ["expenditure"], label = str(year), xlim = [55,70])
+plt.title('Actual health expenditure')
+plt.xlabel('Age')
+plt.ylabel('Dollars')
+plt.savefig(path + "allYearsHealthUs.png")
+plt.legend(loc = "best")
+plt.show()
+
+
+enddf = enddf.set_index("year_index")
+
+# take the mean of the differences
+grouped = enddf["diff"].groupby(enddf["generation"])
+mean_residuals = grouped.mean()
+mean_residuals[20:70].plot(kind="bar")
+plt.title('Average annual amount different from expected expected health expenditure')
+plt.xlabel('Generation')
+plt.ylabel('Dollars (per year)')
+plt.savefig(path + "allAbsDeviationsHealthUs.png")
+plt.show()
+
+# same but with p_diff
+grouped = enddf["p_diff"].groupby(enddf["generation"])
+mean_residuals = grouped.mean()
+mean_residuals[20:70].plot(kind="bar")
+plt.title('Average annual amount different from expected expected health expenditure')
+plt.xlabel('Generation')
+plt.ylabel('Dollars (per year)')
+plt.savefig(path + "allAbsDeviationsHealthUs.png")
+plt.show()
+
+# best five
+mean_residuals[30:70].order()[0:5].plot(kind="barh")
+plt.title("Generations with the highest below expected health spending")
+plt.xlabel('Average annual sum below expected health expenditure')
+plt.savefig(path + "bestHealthUs.png")
+plt.show()
+
+# worst five
+mean_residuals[30:70].order(ascending=False)[0:5].plot(kind="barh")
+plt.title("Generations with the highest above expected health spending")
+plt.xlabel('Average annual sum above expected health expenditure')
+plt.savefig(path + "worstHealthUs.png")
+plt.show()
+
+# Create some useful dictionary sets (and sub-groups, plots) with the information created so far
+generation_n = dict(enddf.generation.value_counts())
+generation_n[2008]
+
+generation_mean = dict(enddf["expenditure"].groupby([enddf["generation"]]).mean())
+enddf["expenditure"].groupby([enddf["generation"]]).mean().plot()
+plt.show()
+
+generation_sum = dict(enddf["expenditure"].groupby([enddf["generation"]]).sum())
+enddf["expenditure"].groupby([enddf["generation"]]).mean().plot()
+plt.show()
+
+# see if diff is stable for one generation across time
+a = enddf["diff"].groupby([enddf["generation"], enddf["year"]])
+enddf["diff"][enddf["generation"] > 1936][enddf.generation < 1980]
+enddf["diff"][enddf["generation"] == 1962].plot(kind="bar")
+plt.show()
+
+enddf["diff"][enddf["generation"] == 1946].plot(kind="bar")
+plt.show()
+
+#q are any groups stable and uniformly pluss or minus across most years?
+
+
+# average in different age groups (high 63 64, then low? for all generations?)
+enddf.head(25)
+grouped = enddf["diff"].groupby(enddf["age"])
+mean_residuals = grouped.mean()
+mean_residuals[10:85].plot(kind="bar")
+plt.title('Average annual amount different from expected expected health expenditure')
+plt.xlabel('Age')
+plt.ylabel('Dollars (per year)')
+plt.savefig(path + "ageAveragesMOstHealthy.png")
+plt.show()
+
+enddf["diff"][enddf["age"] == 63].plot(kind="bar")
+plt.show()
+
+enddf.plot(x = "age", y= "diff")
+plt.show()
+
+enddf["diff"][enddf["age"]==65].plot()
+plt.show()
+
+for age in range(60,67):
+    enddf["diff"][enddf["age"]==age].plot(label = str(age))
+plt.title('Average annual amount different from expected expected health expenditure (by age, in different years)')
+plt.xlabel('Age')
+plt.ylabel('Dollars (per year)')
+plt.savefig(path + "ageAvdiff.png")
+plt.legend(loc = "best")
+plt.show()
+
+
+
+# some key plots
+#enddf = enddf.reset_index()
+enddf[["expenditure", "fit", "diff"]][enddf.year == 2010].plot()
+plt.show()
+enddf["expenditure"][enddf.year == 2010]
+
+
+# helpful checks
+enddf.head(10)
+xl.Workbook()
+xl.view(enddf.generation)
+
+
+
+# Notes
+#1. Take percentage diff (comparet to mean spending for that age group, actual or estimated) and not absolute diff
+#2. Do the analysis for number of hospital visits, not just health expenditure
+#3. Do some analysis of mortality, length of life
+#4. Stability: Are the diffs (for a generation) relatively stable over time or dominated by a few large differences in some years
+#5. Simulation: What kind of difffs might be expected given a certain level of stochasticity in the expenses + sampling uncertainty
+#6. Gender diffferences? (As well as other categories - insured vs. uninsured)
+#7. Generational size may be an important factor. Large = clogs/congestion, education impacts, economic impact (jobs)
+#8. More specific q: 1962? 1946?
+#9. Focus on before or after 1965 (medicare issue - lead to jumps and strategic adjustments)
+#10. Make sure missing values are as they should be (no people born after 1996 in 1996 data and so on). Ex. expenditure for 1911 generation in 2010 if noen exist should be missing, not zero etc
+#11. Maybe geometric mean would be better (geometric mean of percentage deviations - depends on underlying assumption avout health model)
+#12. Standard error estimates
+#13. Distinguish between insured and uninsured, male and female
+
+
+
