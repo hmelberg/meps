@@ -1,0 +1,179 @@
+from __future__ import division
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from pandas import DataFrame, Series
+from collections import Counter
+import xl
+import string
+
+
+# read data files function
+def read_columns(years, vars):
+    nan_values = {"age53x": [-1, -3]}
+    dfList = []
+    for i in years:
+        file = path + "meps" + str(i) + "r.csv"
+        print file
+        try:
+            dfTemp = pd.read_csv(file, sep=";", usecols = vars, na_values = nan_values)
+            dfTemp["year"] = i
+            if i == 1996:
+                dfTemp["panel"] = 1
+            dfList.append(dfTemp)
+            print ("yes")
+        except:
+            print ("no")
+    return dfList
+
+# make content of race and ethnic variables more consistent across years
+def recode(df2, var, recode_years, old_new_map2):
+    for year in recode_years:
+        df2[var][df2.year==year] = df2[var][df2.year==year].map(old_new_map2)
+    return df2
+
+def recode_var(values, var, years, old, new):
+    for year in years:
+        df_temp[var][df["year"==year]].replace(old, new, inplace=True)
+    return series
+
+# create expenditure variablelist function
+def create_spending_vars():
+    spending_type_vars=['tot' , 
+                  'obv' , 'obd' , 'obo' , 'obc' , 'obn' , 'obe' , 'oba' , 'obt' , 
+                  'opt' , 'opf' , 'opd' , 'opv' , 'ops' , 'opo' , 'opp' , 
+                  'amc' , 'amn' , 'ame' , 'ama' , 'amt' , 
+                  'ert' , 'erf' , 'erd' , 
+                  'ipt' , 'ipf' , 'ipd' , 
+                  'zif' , 'zid' , 
+                  'rx' , 
+                  'dvt' , 'dvg' , 'dvo' , 
+                  'hha' , 'hhn' , 
+                  'vis' , 
+                  'oth']
+    
+    spending_source_vars = ['exp' , 'slf' , 'mcr' , 'mcd' , 'prv' , 'va' , 'tri' , 'ofd' , 'stl' , 'wcp' , 'opr' , 'opu' , 'osr', 'prt', 'oth', 'tch']
+
+    vars=[]
+    for type in spending_type_vars:
+        for source in spending_source_vars:       
+            var = type + source
+            vars.append(var)
+    return vars
+
+# import pytables
+
+# create and define some key variables
+path = """C:\Users\hmelberg_user\Documents\data\meps\mepsmain\mepsnoyear\\"""
+years = range(1996, 2011)
+
+expenditure_vars = create_spending_vars()
+all_expenditure_vars = [name for name in expenditure_vars if "tot" in name] 
+
+# read variables and create dataframe
+# hideg = highest degree of education
+
+main_utilization_vars = ["dvtot" , "ertot" , "hhagd" , "hhindd" , "hhinfd" , "hhtotd" , "ipdis" , "ipngtd" , "obtotv" , "opdrv" , "opothv" , "optotv" , "rxtot"]
+sub_utilization_vars = ["amasst" , "amchir" , "amnurs" , "amopt" , "amther"]
+all_utilization_vars = ["obtotv" , "obdrv" , "obothv" , "obchir" , "obnurs" , "obopto" , "obasst" , "obther" , "optotv" , "opdrv" , "opothv" , "amchir" , "amnurs" , "amopt" , "amasst" , "amther" , "ertot" , "" , "" , "" , "" , "ipdis" , "ipngtd" , "ipzero" , "rxtot" , "dvtot" , "dvgen" , "dvorth" , "hhtotd" , "hhagd" , "hhindd" , "hhinfd"]
+
+main_expenditure_vars = ["totexp" , "obvexp" , "optexp" , "ertexp" , "iptexp" , "rxexp" , "dvtexp" , "hhaexp" , "hhnexp" ,"visexp" , "othexp9"]
+all_total_expenditure_vars = ["totexp", "obvexp" , "obdexp" , "oboexp" , "obcexp" , "obnexp" , "obeexp" , "obaexp" , "obtexp" , "optexp" , "opfexp" , "opdexp" , "opvexp" , "opsexp" , "opoexp" , "oppexp" , "amcexp" , "amnexp" , "ameexp" , "amaexp" , "amtexp" , "ertexp" , "erfexp" , "erdexp" , "" , "" , "iptexp" , "ipfexp" , "ipdexp" , "zifexp" , "zidexp" , "rxexp" , "dvtexp" , "dvgexp" , "dvoexp" , "hhaexp" , "hhnexp" , "visexp" , "othexp9" ]
+
+main_personal_condition_vars = ["rthlth31" , "rthlth42" , "rthlth53" , "mnhlth31" , "mnhlth42" , "mnhlth53" , "hibpdx" , "hibpaged" , "chddx" , "chdaged" , "angidx" , "angiaged" , "midx" , "miaged" , "ohrtdx" , "ohrtaged" , "strkdx" , "strkaged" , "emphdx" , "emphaged" , "chbron31" , "chbron53" , "choldx" , "cholaged" , "cancerdx" , "diabdx" , "diabaged" , "jtpain31" , "jtpain53" , "arthdx" , "arthaged" , "asthdx" , "asthaged" , "adhdaddx" , "adhdaged"] 
+all_personal_condition_vars = ["rthlth31" , "rthlth42" , "rthlth53" , "mnhlth31" , "mnhlth42" , "mnhlth53" , "hibpdx" , "hibpaged" , "bpmldx" , "chddx" , "chdaged" , "angidx" , "angiaged" , "midx" , "miaged" , "ohrtdx" , "ohrtaged" , "strkdx" , "strkaged" , "emphdx" , "emphaged" , "chbron31" , "chbron53" , "choldx" , "cholaged" , "cancerdx" , "cabladdr" , "bldraged" , "bldrrems" , "cabone" , "boneaged" , "bonerems" , "cabrain" , "braiaged" , "brairems" , "cabreast" , "brstaged" , "brstrems" , "cacervix" , "cervaged" , "cervrems" , "cacolon" , "coloaged" , "colorems" , "caesoph" , "esphaged" , "esphrems" , "cakidney" , "kidnaged" , "kidnrems" , "calarynx" , "lrnxaged" , "lrnxrems" , "caleukem" , "leukaged" , "leukrems" , "caliver" , "livraged" , "livrrems" , "calung" , "lungaged" , "lungrems" , "calymph" , "lympaged" , "lyphrems" , "camelano" , "melaaged" , "melarems" , "camouth" , "moutaged" , "moutrems" , "camuscle" , "muscaged" , "muscrems" , "caother" , "othraged" , "othrrems" , "caovary" , "ovryaged" , "ovryrems" , "capancrs" , "pancaged" , "pancrems" , "caprosta" , "prstaged" , "prstrems" , "carectum" , "rectaged" , "rectrems" , "caskinnm" , "sknmaged" , "sknmrems" , "caskindk" , "skdkaged" , "skdkrems" , "castomch" , "stomaged" , "stomrems" , "catestis" , "tstsaged" , "tstsrems" , "cathroat" , "thrtaged" , "thrtrems" , "cathyrod" , "thyraged" , "thyrrems" , "cauterus" , "uteraged" , "uterrems" , "diabdx" , "diabaged" , "jtpain31" , "jtpain53" , "arthdx" , "arthtype" , "arthaged" , "asthdx" , "asthaged" , "asstil31" , "asstil53" , "asatak31" , "asatak53" , "asthep31" , "asthep53" , "asacut53" , "asmrcn53" , "asprev53" , "asdaly53" , "aspkfl53" , "asevfl53" , "aswnfl53" , "adhdaddx" , "adhdaged" , "pregnt31" , "pregnt42" , "pregnt53"]
+
+
+#Appendix 1: Summary of Utilization and Expenditure Variables by Health Service Category
+#                                                                   Utilization    Expenditure
+#All Health Services  	                                                        TOTEXP
+#Total Office Based Visits (Physician + Non-physician + Unknown)    	OBTOTV	        OBVEXP
+#Total Outpatient Visits (Physician + Non-physician + Unknown)	    OPTOTV	        OPTEXP
+#   Outpatient Visits to Physicians	                                OPDRV	
+#   Outpatient Visits to Non-Physicians	                            OPOTHV	
+#Total Emergency Room Visits	                                    ERTOT	        ERTEXP
+#Total Inpatient Stays (Including Zero Night Stays)	                IPDIS, IPNGTD	IPTEXP
+#Total Prescription Medicines	                                    RXTOT	        RXEXP
+#Total Dental Visits	                                            DVTOT	        DVTEXP
+#Total Home Health Care                                         	HHTOTD	        --
+#   Agency Sponsored	                                            HHAGD	        HHAEXP
+#   Paid Independent Providers                                  	HHINDD	        HHNEXP
+#   Informal	                                                    HHINFD	        --
+#Other Medical Expenses	 	 
+#Vision Aids		                                                                VISEXP
+#Other Medical Supplies and Equipment	                                  	        OTHEXP9
+
+
+
+
+
+vars = ["age53x", "sex", "racethnx", "racex", "marry31x", "hideg", "povcat", "occcat31", "occcat42", "occcat53" , "unins", "everunins", 
+        "pstats53",
+        "adsmok42",
+        "perwtf", "panel", "dupersid",
+        "chddx", "angidx", "midx", "ohrtdx",
+        "choldx",
+        "cancerdx",
+        "diabdx"] + main_expenditure_vars + main_utilization_vars
+
+df_list = read_columns(years, vars)
+df = pd.concat(df_list, ignore_index=True)
+del df_list
+
+# adjust spending for inflation (could make it integers?)
+us_prices = pd.read_csv(path + 'usa health prices.csv', sep= ';', index_col="year")
+gdp_price_index = dict(us_prices.gdp[:])
+
+adjust_vars = main_expenditure_vars
+
+for var in adjust_vars:
+    for year in years:
+        try: 
+            df[var] = np.where(df['year'] == year, df[var] * 100/gdp_price_index[year], df[var])
+            # print "yes", year, var
+        except:
+            print "no", year, var
+
+
+# make content of race and ethnic variables more consistent across years
+old_new_map = {1: 3, 2: 3, 3: 4, 4: 2, 5: 1, 91: 6}
+recode_years = range(1996,2002)
+df = recode(df, "racex", recode_years, old_new_map)
+
+# import and merge variance estimation variables
+df_weights = pd.read_csv(path + "meps_csv_variance_r.csv", sep=";")
+df = pd.merge(df, df_weights, on = ["dupersid", "panel"])
+
+# Convert to float data type and change decimal point from ',' to '.'
+f = lambda x: float(string.replace(str(x), u',', u'.'))
+df['perwtf'] = df['perwtf'].map(f)
+
+# create some useful variables
+df["age_groups_5"] = (df.age53x//5)*5       # age categories of five years, 0-4, 5-9 and so on)
+df["age_groups_10"] = (df.age53x//10)*10      # age categories of five years, 0-9, 10-19 and so on)
+df["totexp_groups_1000"] = (df.totexp//1000)*1000
+
+# selection variables (cumbersome, but prepared for function def flexibility (use global?)
+new_var = "dead"
+df[new_var] = 0
+criterion_var = "pstats53"
+criterion_values = [24, 31, 61]
+for value in criterion_values:
+    df[new_var][df[criterion_var]==value] = 1
+
+
+
+# data comparability - make -1 age missing, make all above 85 equal 85?
+df["age53x"][df.age53x > 85] = 85
+
+# Drop id na in age or toexp or ...
+df = df[df.age53x.notnull()==1]
+df = df[df.totexp.notnull()==1]
+
+df_dead=df[df.dead==1]
+df_alive=df[df.dead==0]
+
+
+#df_dead.save(path + "mepsDeadPickle")
+#df_alive.save(path + "mepsAlivePickle")
+#df.save(path + "mepsAllPickle")
