@@ -1,0 +1,567 @@
+from __future__ import division
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from pandas import DataFrame, Series
+from collections import Counter
+import xl
+import string
+
+
+# some analysis
+path = """C:\Users\hmelberg_user\Documents\data\meps\mepsmain\mepsnoyear\\"""
+
+df_dead = pd.load(path + "mepsDeadPickle")
+df_alive = pd.load(path + "mepsAlivePickle")
+df = pd.load(path + "mepsAllPickle")
+
+
+# descriptive, article info
+pd.crosstab(df.dead, df.sex, margins=True)                                  # no of male and female dead
+df.pivot_table(["totexp"], rows = ["dead"], cols=["sex"], margins = True)   # aggregate expenditure male and female (dead and alive)
+df.pivot_table(["age53x"], rows = ["dead"], cols=["sex"], margins = True)   # average age male and female (dead and alive)
+df["age_groups_5"][df.dead==1].value_counts().sort_index()
+df["age_groups_5"][df.dead==1].value_counts().sort_index().plot(title = "Age distribution of respondents who died", kind = "bar")
+plt.show()
+
+df_dead.totexp[df_dead.totexp<200000].hist(bins=40)
+plt.show()
+
+grouped = df.groupby(["dead", "sex"])
+get_wav_totexp = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+grouped.apply(get_wav_totexp).unstack()
+grouped.size().unstack()
+
+# Health expenditure, annual averages in different age groups - by gender and death
+groups = ["age_groups_5", "dead", "sex"]
+grouped = df.groupby(groups)
+get_wavg = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+wavg = grouped.apply(get_wavg).unstack().unstack()
+grouped.size()
+
+fig= plt.figure(); ax = fig.add_subplot(1,1,1)
+wavg[1][1].plot(label="Male")
+wavg[2][1].plot(label="Female")
+plt.title("Total End of Life Health Expenditure")
+plt.xlim([50,80])
+plt.ylim([0,50000])
+plt.xlabel('Age')
+plt.ylabel('Dollars')
+plt.legend(loc="best")
+plt.savefig(path + "eolMepsAge.png")
+plt.show()
+
+# Health expenditure, annual medians in different age groups - by gender and death (not weighted)
+groups = ["age_groups_5"]
+grouped = df_dead.groupby(groups)
+grouped.totexp.mean().plot(label = "mean")
+grouped.totexp.median().plot(label = "median")
+plt.title("Total End of Life Health Expenditure")
+plt.xlabel('Age')
+plt.ylabel('Dollars')
+plt.xlim([50,80])
+plt.legend(loc="best")
+plt.savefig(path + "eolMepsAgeMedianSpending.png")
+plt.show()
+grouped.size()
+
+groups = ["age_groups_5"]
+grouped = df_alive.groupby(groups)
+grouped.totexp.mean().plot(label = "mean")
+grouped.totexp.median().plot(label = "median")
+plt.title("Total Health Expenditure")
+plt.xlabel('Age')
+plt.ylabel('Dollars')
+plt.xlim([50,80])
+plt.legend(loc="best")
+plt.savefig(path + "MepsAgeMedianSpending.png")
+plt.show()
+grouped.size()
+
+
+# Hospital expenditure, annual averages in different age groups - by gender and death
+groups = ["age_groups_5", "dead"]
+grouped = df.groupby(groups)
+get_wavg = lambda g: np.average(g["iptexp"], weights=g["perwtf"])
+wavg = grouped.apply(get_wavg).unstack()
+wavg.plot(xlim=([50,80]))
+
+fig= plt.figure(); ax = fig.add_subplot(1,1,1)
+wavg[1][1].plot(label="Male")
+wavg[2][1].plot(label="Female")
+plt.title("Total End of Life Health Expenditure")
+plt.xlim([50,80])
+plt.ylim([0,50000])
+plt.xlabel('Age')
+plt.ylabel('Dollars')
+plt.legend(loc="best")
+plt.savefig(path + "eolMepsIpAge.png")
+plt.show()
+
+# previous year
+deadid = df_dead.index
+df[df_dead.index]
+df_t = df[["totexp", "dupersid", "age_groups_5", "dead", "perwtf"]].set_index("dupersid")
+df_d = df_dead[["totexp", "dupersid", "perwtf"]].set_index("dupersid")
+
+df_previous = df_t.ix[list(df_d.index)]
+df_previous = df_previous[df_previous.dead!=1]
+
+grouped = df_previous.groupby("age_groups_5")
+get_wavg = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+wavg = grouped.apply(get_wavg)
+wavg.plot(xlim=([50,80]))
+plt.show()
+
+#get just sum
+df_previous = df_previous.reset_index()
+get_wavg = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+wavg = df_previous["totexp"].agg(np.average)
+df_previous.totexp
+
+
+df_t[df_t.dead==1]
+
+
+
+# By ethnic group
+groups = ["racex", "dead"]
+grouped = df_dead.groupby(groups)
+get_wavg = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+wavg = grouped.apply(get_wavg).unstack()
+grouped.size()
+
+# By smoking group
+groups = ["adsmok42"]
+grouped = df_dead.groupby(groups)
+get_wavg = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+wavg = grouped.apply(get_wavg)
+wavg
+grouped.size()
+
+# if cancer
+groups = ["cancerdx"]
+grouped = df_dead.groupby(groups)
+get_wavg = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+wavg = grouped.apply(get_wavg)
+wavg
+grouped.size()
+
+# if ...
+many_groups = ["cancerdx", "chddx", "angidx", "midx", "ohrtdx","choldx", "adsmok42", "diabdx", "povcat", "marry31x"]
+for groups in many_groups:
+    grouped = df_dead.groupby(groups)
+    get_wavg = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+    wavg = grouped.apply(get_wavg)
+    print wavg
+    print grouped.size()
+
+"chddx", "angidx", "midx", "ohrtdx",
+        "choldx",
+
+
+
+# Spending depending on insurance status (rem: unsured may have different age and so on so ... propensity score? may also use it to estimate effect of spending? treat = ins, utfall= dead next year? age at death? reported health?)
+df.unins.value_counts()
+df.unins[df.dead==1].value_counts()
+groups = ["unins", "dead"]
+grouped = df.groupby(groups)
+grouped.size()
+get_wavg = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+wavg = grouped.apply(get_wavg).unstack().unstack().unstack()
+
+wavg.plot(kind = "bar", title = "Health expenditure, annual averages in different age groups")
+
+fig = plt.figure(); ax = fig.add_subplot(1,1,1)
+wavg.ix[1][:].plot(kind = "bar", legend = False)
+ticks = ax.set_xticks([1,2])
+labels = ax.set_xticklabels(["Uninsured", "Insured"])
+plt.setp(plt.xticks()[1], rotation=0)
+# plt.xlabel('Insurance vs. Uninsured')
+plt.ylabel('Dollars')
+plt.title("Total End of Life Health Expenditure")
+plt.draw()
+plt.show()
+
+# cost and insurance status for those below 65
+df_dead.totexp[df_dead.age53x<65].groupby(df_dead.unins).mean()
+df_dead.totexp[df_dead.age53x<65].groupby(df_dead.unins).count()
+df_dead.age53x[df_dead.age53x<65].groupby(df_dead.unins).std()
+
+groups = ["unins", "dead"]
+grouped = df_dead[df_dead.age53x<65].groupby(df_dead.unins)
+grouped.mean()
+grouped.std()
+grouped.size()
+get_wavg = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+wavg = grouped.apply(get_wavg)
+
+## Spending by self?
+
+# Overall spending by self
+groups = ["dead"]
+grouped = df.groupby(groups)
+grouped.size()
+get_wavg_tot = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+get_wavg_slf = lambda g: np.average(g["totslf"], weights=g["perwtf"])
+wavg_tot = grouped.apply(get_wavg_tot)
+wavg_slf = grouped.apply(get_wavg_slf)
+
+# by age, spending by self
+groups = ["age_groups_5", "dead"]
+grouped = df.groupby(groups)
+grouped.size()
+get_wavg_tot = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+get_wavg_slf = lambda g: np.average(g["totslf"], weights=g["perwtf"])
+wavg_tot = grouped.apply(get_wavg_tot).unstack()
+wavg_slf = grouped.apply(get_wavg_slf).unstack()
+wavg_exp = pd.merge(wavg_tot, wavg_slf, left_index=True, right_index=True)
+
+wavg_exp.plot()
+
+
+fig = plt.figure(); ax = fig.add_subplot(1,1,1)
+wavg_exp["1_x"].plot(label = "Paid in total")
+wavg_exp["1_y"].plot(label = "Paid by self")
+plt.ylabel('Dollars')
+plt.title("Total End of Life Health Expenditure")
+plt.xlim([50,80])
+plt.ylim([0,50000])
+plt.xlabel('Age')
+plt.ylabel('Dollars')
+plt.legend(loc="best")
+plt.draw()
+plt.show()
+
+
+# expenditure by insurance status
+df_dead=df[df.dead==1]
+groups = ["unins"]
+grouped = df_dead.groupby(groups)
+grouped.size()
+get_wavg_tot = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+get_wavg_slf = lambda g: np.average(g["totslf"], weights=g["perwtf"])
+wavg_tot = grouped.apply(get_wavg_tot)
+wavg_slf = grouped.apply(get_wavg_slf)
+
+fig = plt.figure(); ax = fig.add_subplot(1,1,1)
+wavg_tot.plot(kind = "bar", label = "Total", color = "r")
+wavg_slf.plot(kind = "bar", label = "Self", color = "g")
+ticks = ax.set_xticks([1,2])
+labels = ax.set_xticklabels(["Uninsured", "Insured"])
+plt.setp(plt.xticks()[1], rotation=0)
+# plt.xlabel('Uninsured vs. Insured')
+plt.ylabel('Dollars')
+plt.title("Who pays for End of Life Health Expenditure")
+plt.legend(loc="best")
+plt.draw()
+plt.show()
+
+
+# what do they pay for?
+means={}
+for category in main_expenditure_vars:
+    try:
+        m = np.average(df_dead[category], weights=df_dead.perwtf)
+        means[category] = m
+    except:
+        print category, "no"
+
+df_means = DataFrame(means, index = main_expenditure_vars)
+main_expenditure_vars_labels = ["Dental", "Emergency Room", "Home Health Agency", "Home Health non-Agency", "In-patient", "Office based V", "Office Based T", "RX", "Total", "Visual"]
+s_means = Series(means, index = main_expenditure_vars)
+s_means.plot("Type of expenditure", kind = "bar")
+plt.show()
+
+# by education
+
+df.hideg.value_counts()
+
+groups = ["hideg"]
+grouped = df_dead.groupby(groups)
+grouped.size()
+get_wavg_tot = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+wavg_tot = grouped.apply(get_wavg_tot)
+wavg_tot.plot(kind = "bar")
+plt.show()
+#[-9  = NOT ASCERTAINED] [-8  = DK] [-7  = REFUSED] [1  = NO DEGREE] [2  = GED] [3  = HIGH SCHOOL DIPLOMA] [4  = BACHELOR'S DEGREE] [5  = MASTER'S DEGREE] [6  = DOCTORATE DEGREE] [7  = OTHER DEGREE] [8  = UNDER 16-INAPPLICABLE]
+
+
+# services received
+means={}
+for category in main_utilization_vars:
+    try:
+        m = np.average(df_dead[category], weights=df_dead.perwtf)
+        means[category] = m
+    except:
+        print category, "no"
+
+df_utilization_means = DataFrame(means, index = main_expenditure_vars)
+main_utilization_vars_labels = ["Dental", "Emergency Room", "Home Health Agency", "Home Health non-Agency", "In-patient", "Office based V", "Office Based T", "RX", "Total", "Visual"]
+s_means = Series(means, index = main_utilization_vars)
+s_means.plot("Type of service", kind = "bar")
+plt.show()
+
+# compare services 60-64 and 65-69
+df_dead6064 = df_dead[df.age53x>59][df.age53x<65]
+df_dead6670 = df_dead[df.age53x>65][df.age53x<70]
+means6064={}
+means6670={}
+
+for category in main_utilization_vars:
+    try:
+        m = np.average(df_dead6064[category], weights=df_dead6064.perwtf)
+        means6064[category] = m
+        m = np.average(df_dead6670[category], weights=df_dead6670.perwtf)
+        means6670[category] = m
+    except:
+        print category, "no"
+
+df_utilization_means6064 = DataFrame(means6064, index = main_expenditure_vars)
+df_utilization_means6670 = DataFrame(means6670, index = main_expenditure_vars)
+main_utilization_vars_labels = ["Dental", "Emergency Room", "Home Health Agency", "Home Health non-Agency", "In-patient", "Office based V", "Office Based T", "RX", "Total", "Visual"]
+s_means6064 = Series(means6064, index = main_utilization_vars)
+s_means6670 = Series(means6670, index = main_utilization_vars)
+all_means = pd.merge(s_means6064, s_means6670)
+df_means = DataFrame([s_means6064, s_means6670], index = ["Age 60-64", "Age 65-70"])
+df_means.T.plot(kind="bar")
+plt.show()
+
+
+s_means6064.plot("Type of service", kind = "bar", color = "b")
+s_means6670.plot("Type of service", kind = "bar", color = "r")
+plt.show()
+
+
+
+
+
+
+
+
+
+from scipy.stats.stats import nanmean 
+dat = np.array([[1,2,3], [4,5,nan], [nan,6,nan], [nan,nan,nan]])
+mdat = np.ma.masked_array(dat,np.isnan(dat))
+mm = np.mean(mdat,axis=1)
+print mm.filled(np.nan) # the desired answer
+
+a= np.ma.masked_array(df_dead["iptexp"], np.isnan(df_dead["iptexp"]))
+
+dat = np.array([[1,2,3], [4,5,nan], [nan,6,nan], [nan,nan,nan]])
+
+mdat = np.ma.masked_array(dat,np.isnan(dat))
+
+mm = np.mean(mdat,axis=1)
+print mm.filled(np.nan) # the desired answer
+
+
+df.iptexp
+
+np.average(df_dead["totexp"], weights=df_dead.perwtf)
+
+df_dead2 = df_dead[df_dead.iptexp
+
+
+get_wavg_tot = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+get_wavg_slf = lambda g: np.average(g["totslf"], weights=g["perwtf"])
+wavg_tot = grouped.apply(get_wavg_tot)
+wavg_slf = grouped.apply(get_wavg_slf)
+
+
+
+
+
+
+
+
+# drafts
+
+df_dead=df[df.dead==1]
+df_alive=df[df.dead==0] # nb may want to eliminate unknowns so they are not included as alive? but then again, they may not have any other info so no problem? or? zero?
+np.average(df_dead["totexp"], weights=df_dead["perwtf"], returned = True)
+np.average(df_alive["totexp"], weights=df_alive["perwtf"], returned = True)
+
+
+
+
+hist, bins = np.histogram(df_dead.age53x, weights = df_dead.perwtf)
+width = 0.7*(bins[1]-bins[0])
+center = (bins[:-1]+bins[1:])/2
+plt.bar(center, hist, align = 'center', width = width)
+plt.show()
+
+np.histogram(x,bins = 50)
+
+
+
+# my info
+df 
+var_info={}
+for var in df:
+    var_info[var] = df[var][df.dead==1].describe()
+var_info["totexp"]
+
+
+np.average(df["totexp"][df.dead==1], weights=df["perwtf"][df.dead==1])
+np.average(df["totexp"][df.dead==0], weights=df["perwtf"][df.dead==0])
+
+grouped = df.groupby("dead")
+get_wav_totexp = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+grouped.apply(get_wav_totexp)
+
+np.average(df["totexp"][df.dead==1], weights=df["perwtf"][df.dead==1])
+
+grouped = df.groupby("dead")
+get_wav_totexp = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+grouped.apply(get_wav_totexp)
+
+df["one"]=1
+
+
+grouped = df.groupby("dead")
+get_wav_totexp = lambda g: np.sum(g["perwtf"], weights=g["perwtf"])
+grouped.apply(get_wav_totexp)
+
+
+df["totexp"][df.dead==0].describe()
+df_var_info = DataFrame(var_info)
+df_var_info  
+df.dead.value_counts()                                      # no of obs and  no of dead
+pd.crosstab(df.dead, df.sex, margins=True)                  # no of male and female dead
+df.pivot_table(["totexp"], rows = ["sex"], cols=["dead"])   # aggregate expenditure male and female (dead and alive)
+df.pivot_table(["age53x"], rows = ["sex"], cols=["dead"])   # average age male and female (dead and alive)
+df["age_groups_5"][df.dead==1].hist(bins=)
+plt.show()
+
+age_distribution = df.age53x[df.dead==1]
+
+df["age53x"][df.dead==1].hist(bins=50)
+df["age_groups_5"][df.dead==1].hist()
+age_distribution = age_distribution.value_counts().sort_index()
+age_distribution.values.hist(bins=20)
+plt.show()
+
+# Health expenditure, annual averages in different age groups - by gender and death
+groups = ["age_groups_5", "dead", "sex"]
+grouped = df.groupby(groups)
+get_wavg = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+wavg = grouped.apply(get_wavg).unstack().unstack()
+
+fig= plt.figure(); ax = fig.add_subplot(1,1,1)
+wavg[1][1].plot(label="Male")
+wavg[2][1].plot(label="Female")
+plt.title("Total End of Life Health Expenditure")
+plt.xlim([50,80])
+plt.ylim([0,50000])
+plt.xlabel('Age')
+plt.ylabel('Dollars')
+plt.legend(loc="best")
+plt.show()
+
+# Spending depending on insurance status
+df.unins.value_counts()
+df.unins[df.dead==1].value_counts()
+groups = ["unins", "dead"]
+grouped = df.groupby(groups)
+grouped.size()
+get_wavg = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+wavg = grouped.apply(get_wavg).unstack().unstack().unstack()
+
+wavg.plot(kind = "bar", title = "Health expenditure, annual averages in different age groups")
+
+fig = plt.figure(); ax = fig.add_subplot(1,1,1)
+wavg.ix[1][:].plot(kind = "bar", legend = False)
+ticks = ax.set_xticks([1,2])
+labels = ax.set_xticklabels(["Uninsured", "Insured"])
+plt.setp(plt.xticks()[1], rotation=0)
+plt.xlabel('Insurance vs. Uninsured')
+plt.ylabel('Dollars')
+plt.title("Total End of Life Health Expenditure")
+plt.draw()
+plt.show()
+
+## Spending by self?
+
+# Overall
+groups = ["dead"]
+grouped = df.groupby(groups)
+grouped.size()
+get_wavg_tot = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+get_wavg_slf = lambda g: np.average(g["totslf"], weights=g["perwtf"])
+wavg_tot = grouped.apply(get_wavg_tot)
+wavg_slf = grouped.apply(get_wavg_slf)
+
+# by age
+groups = ["age_groups_5", "dead"]
+grouped = df.groupby(groups)
+grouped.size()
+get_wavg_tot = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+get_wavg_slf = lambda g: np.average(g["totslf"], weights=g["perwtf"])
+wavg_tot = grouped.apply(get_wavg_tot).unstack()
+wavg_slf = grouped.apply(get_wavg_slf).unstack()
+wavg_exp = pd.merge(wavg_tot, wavg_slf, left_index=True, right_index=True)
+
+wavg_exp.plot()
+
+
+fig = plt.figure(); ax = fig.add_subplot(1,1,1)
+wavg_exp["1_x"].plot(label = "Paid in total")
+wavg_exp["1_y"].plot(label = "Paid by self")
+plt.ylabel('Dollars')
+plt.title("Total End of Life Health Expenditure")
+plt.xlim([50,80])
+plt.ylim([0,50000])
+plt.xlabel('Age')
+plt.ylabel('Dollars')
+plt.legend(loc="best")
+plt.draw()
+plt.show()
+
+# by insurance status
+df_dead=df[df.dead==1]
+groups = ["unins"]
+grouped = df_dead.groupby(groups)
+grouped.size()
+get_wavg_tot = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+get_wavg_slf = lambda g: np.average(g["totslf"], weights=g["perwtf"])
+wavg_tot = grouped.apply(get_wavg_tot)
+wavg_slf = grouped.apply(get_wavg_slf)
+
+fig = plt.figure(); ax = fig.add_subplot(1,1,1)
+wavg_tot.plot(kind = "bar", label = "Total", color = "r")
+wavg_slf.plot(kind = "bar", label = "Self", color = "g")
+ticks = ax.set_xticks([1,2])
+labels = ax.set_xticklabels(["Uninsured", "Insured"])
+plt.setp(plt.xticks()[1], rotation=0)
+# plt.xlabel('Uninsured vs. Insured')
+plt.ylabel('Dollars')
+plt.title("Who pays for End of Life Health Expenditure")
+plt.legend(loc="best")
+plt.draw()
+plt.show()
+
+# what do they pay for?
+df_dead=df[df.dead==1]
+groups = ["unins"]
+grouped = df_dead.groupby(groups)
+grouped.size()
+categories = ["totexp", "obvexp", "optexp", "ertexp", "iptexp", "rxexp", "hhaexp", "hhnexp"]
+for category in categories:
+    try:
+        print category, df[category].count()
+    except:
+        print category, "no"
+
+get_wavg_tot = lambda g: np.average(g["totexp"], weights=g["perwtf"])
+get_wavg_slf = lambda g: np.average(g["totslf"], weights=g["perwtf"])
+wavg_tot = grouped.apply(get_wavg_tot)
+wavg_slf = grouped.apply(get_wavg_slf)
+
+
+
+# export df to stata readable file
+df.to_csv(path + "meps_eol.csv")
+
+# saving data to hdf5
+df.to_hdf('store_tl.h5','table',append=True)
