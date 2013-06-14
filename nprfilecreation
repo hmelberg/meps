@@ -1,0 +1,643 @@
+from __future__ import division
+import pandas as pd
+from pandas import DataFrame, Series
+from collections import Counter
+import numpy as np
+import statsmodels.api as sm
+from statsmodels.iolib.foreign import StataReader
+import matplotlib.pyplot as plt
+import xl
+import string
+
+
+path = r"""C:\Users\hmelberg_user\Documents\data\npr\\"""
+
+dfe = pd.load(path + "dfe_eolnprpickle")
+dfp = pd.load(path + "dfp_eolnprpickle")
+
+df1 = pd.load(path + "df1a_eolnprpickle")
+df2 = pd.load(path + "df2a_eolnprpickle")
+df = pd.concat([df1, df2], ignore_index=True)
+
+
+df1 = pd.load(path + "df1_eolnprpickle")
+df2 = pd.load(path + "df2_eolnprpickle")
+
+
+
+
+
+# open file
+
+df = sm.iolib.genfromdta(path + "eolnprreducedv2dead.dta", pandas=True)
+df = sm.iolib.genfromdta(path + "eolnprreducedv2.dta", pandas=True)
+
+# open npr2008 file
+df2008= pd.read_csv(path + "npr liggetid 2008 v2b english.csv", sep = ";")
+
+
+
+vars_dtypes = {"id" : np.int32 , "birth_year" : np.int16 , "male" : np.int8 , "points" : np.float16 , "icd10" : string, "drg" : string}
+vars = vars_dtypes.keys()
+df2008= pd.read_csv(path + "npr liggetid 2008 v2b english.csv", usecols = vars, dtype = vars_dtypes, sep = ";")
+
+# generate person level file 2008
+df2008.points = df2008.points.convert_objects(convert_numeric=True)
+df2008.points.sum()
+df2008.head()
+df2008.dtypes
+df2008["strpoints"] = df2008.points.apply(str)
+df2008.points.apply(np.float16)
+df2008 = df2008.sort("id")
+grouped = df2008.groupby("id")
+fdict = {"birth_year" : np.max, "male" : np.max, "points" : ["sum", "max", "count"], "strpoints": one_list, "icd10" : one_list, "drg": one_list} 
+dfp2008= grouped.agg(fdict)
+dfp2008.head(25)
+dfp2008
+dfp2008.save(path + "dfp_npr2008pickle")
+del df2008
+dfp2008.set_columns(["1","2","3","4","5","6","7","8"])
+
+# Generate person level file summary
+df = sm.iolib.genfromdta(path + "eolnprreducedv2dead.dta", pandas=True)
+df = pd.load(path + "df_deadnprpickle")
+df = df[df.type<3]
+df = df[df.out_year == 2008]
+
+def one_list(arr):
+    a = list(arr)
+    #a.append(" ")
+    return a
+
+df = df.replace(-2, np.nan)
+df = df.replace(-1, np.nan)
+df = df.replace("-2", "")
+df = df.replace("-1", "")
+df.drg
+df.icd10
+df.points
+df["strpoints"] = df.points.apply(str)
+
+df.dtypes
+
+grouped = df.groupby("id")
+fdict = {"birth_year" : np.max, "male" : np.max, "points" : ["sum", "max", "count"], "strpoints": one_list, "icd10" : one_list, "drg": one_list, "dead_year": np.max, "dead_month" : np.max} 
+grodf= grouped.agg(fdict)
+grodf.head()
+grodf.save(path + "dfp_npreol2008pickle")
+grodf=grodf.reset_index()
+grodf.dtypes
+
+
+# store in more efficient format
+store = pd.HDFStore(path + "eolnprreducedv2dead.h5")
+store["nprdead"] = df
+store
+
+
+df_label = pd.read_csv(path + "drg2008to2010reducedv1.csv", sep = ";")
+df_label = sm.iolib.genfromdta(path + "eoldrg.dta", pandas=True)
+df_label = sm.iolib.genfromdta(path + "eoldrg.dta", pandas=True)
+
+
+
+# create list of drg codes internally
+df_labels = sm.iolib.genfromdta(path + "eoldrg.dta", pandas=True)
+vars = ["points", "threshold", "points_uncorrected", "surgery", "out_year", "drg"]
+#vars = ["points", "threshold", "out_year", "drg"]
+
+def one_list(arr):
+    a = list(arr)
+    a.append(" ")
+    return a
+
+df_labels = df_labels[vars]
+df_labels = df_labels.drop_duplicates(vars)
+df_labels = df_labels.sort_index(by= vars)
+df_labels[-10:]
+vars.remove("drg")
+df_labels["all_drg"] = df_labels.groupby(vars).transform(one_list)
+df_labels["all_drg_n"] = df_labels.all_drg.map(len)
+df_labels["all_drg_n"].value_counts()
+df_labels = df_labels[df_labels.all_drg_n <3]
+df_labels["index"]=range(len(df_labels))
+df_labels = df_labels.set_index("index")
+df_labels.rename(columns = {"year" : "out_year"}, inplace=True)
+del df_labels["all_drg"]
+del df_labels["all_drg_n"]
+df_labels.to_csv(path + "internalDrgLabelsV1.csv")
+
+# merge df and labels
+df = pd.merge(df, df_labels, on = vars)
+df.dtypes
+df_labels.dtypes
+df.points
+df_labels.points
+df.head(10)
+df_labels[600:650]
+
+df.ix[100:122][["id", "drg_x", "drg_y"]]
+df.drg_x.value_counts().sort_index()
+df.drg_y.value_counts().sort_index()
+df.drg_x.value_counts()
+df.drg_y.value_counts()
+df.drg_x
+df.drg_y
+
+df= df.sort_index(by= "id")
+df.dead_year
+
+# Collect an individuals drg
+line_drgs = df.groupby(["id"])["drg_y"].agg(collect_all_drg)
+
+def collect_all_drg(arr):
+    a = tuple(arr)
+    return a
+
+
+df.head(10)
+df.all_drg
+
+# or create personfile (dict, function for all variables, some max some ... etc)
+
+# or select using in in the existing structure
+keep_drgs = ["410A", "410B"]
+df.groupby(["id"])["drg_y"=keep_drgs]
+
+#vars.remove(["drg", "mdg"])
+df_labels['identifier'] = join_cols(vars)
+df_labels['identifier_count'] = df_labels.groupby("identifier")["drg"].value_counts()
+
+
+
+df_labels.groupby("identifier")["drg"].value_counts()
+df_labels.groupby("identifier").agg({"drg": np.count_nonzero})
+
+df_labels.groupby("identifier")["drg"].size()
+
+
+def join_cols(vars):
+    temp = ""
+    for var in vars:
+        temp = temp + df_labels[var].map(str) + " "
+    return temp
+
+df_labels.points.map(str) + " " + df_labels.threshold.map(str) + df_labels.year.map(str)
+
+str([df_labels[i].map(str) for i in vars] )
+vars.remove("drg")
+
+df_labels.groupby(vars)["drg"].count()
+df_labels.groupby(vars).count()
+
+# merge in drg codes
+df2010 = df[df.out_year == 2010]
+dfl2010 = df_label[df_label.year == 2010]
+vars = ["points", "threshold", "mdg", "surgery", "year"]
+df_labels = df_label.drop_duplicates(vars)
+df_labels.head(10)
+
+drg2010set = set(df_labels.drg[df_labels.year==2010])
+len(drg2010set)
+
+df2010 = pd.merge(df2010, dfl2010u, how = "left", on = vars)
+df2010.drg_x
+df2010.drg_y
+
+drg_count = dict(df2010.drg_x.value_counts().sort_index())
+df2010.drg_y.value_counts().sort_index()
+
+code_list = ["409O", "410A", "410B", "410C"]
+
+for i in code_list:
+    print drg_count[i]
+
+## add more codes
+
+# select (cancer) drg codes
+code_list = ["409O", "410A", "410B", "410C"]
+df["inferred_cancer_drg"]=0
+df["inferred_cancer_drg"][df.out_year==2010][df.threshold==1][df.points==1.03][df.points_uncorrected == 0]
+df["inferred_cancer_drg"][df.out_year==2010][df.threshold==1]
+
+
+df2010.dtypes
+dfl2010u.dtypes
+
+# create person and event files
+p_vars_dtypes = {"id" : np.int32 , "birth_year" : np.int16 , "male" : np.int8 , "dead_year" : np.int16 , "dead_month" : np.int8}
+vars = p_vars_dtypes.keys()
+dfp = pd.read_csv(path + "eolnprreducedv2personfile.csv", usecols = vars, dtype = p_vars_dtypes, sep = ";", index_col="id")
+dfp.save(path + "dfp_eolnprpickle")
+
+e_vars_dtypes = {"id" : np.int32 , "days" : np.int16 , "mdg" : np.int8 , 
+               "threshold" : np.int8 , "surgery" : np.int8 , "points_uncorrected" : np.float16 , "points" : np.float16 , 
+               "type" : np.int8 ,"out_year" : np.int16 , "out_month" : np.int8 , "out_to" : np.int8}
+vars = e_vars_dtypes.keys()
+dfe = pd.read_csv(path + "eolnprreducedv2eventfile.csv", usecols = vars, dtype = e_vars_dtypes, sep = ";", index_col="id")
+dfe.save(path + "dfe_eolnprpickle")
+
+dfp.reindex("id")
+
+dfp
+
+npr liggetid 2008 v2b english
+drg2008to2010reducedv1
+
+
+vars_dtypes = {"id" : np.int32 , "birth_year" : np.int8 , "days" : np.int8 , "mdg" : np.int8 , 
+               "threshold" : np.int8 , "surgery" : np.int8 , "points_uncorrected" : np.float16 , "points" : np.float16 , 
+               "type" : np.int8 , "male" : np.int8 , "out_year" : np.int8 , "out_month" : np.int8 , 
+               "dead_year" : np.int8 , "dead_month" : np.int8 , "out_to" : np.int8}
+vars = vars_dtypes.keys()
+df1 = pd.read_csv(path + "nprdf1.csv", usecols = vars, dtype = vars_dtypes, sep = ";")
+df1.save(path + "df1a_eolnprpickle")
+del df1
+
+df2 = pd.read_csv(path + "nprdf2.csv", usecols = vars, dtype = vars_dtypes, sep = ";")
+df2.save(path + "df2a_eolnprpickle")
+
+
+vars_dtypes = {"id" : np.int32 , "birth_year" : np.int8 , "days" : np.int8 , "mdg" : np.int8 , 
+               "threshold" : np.int8 , "surgery" : np.int8 }
+vars = vars_dtypes.keys()
+
+df1 = pd.read_csv(path + "eolnprreducedv2.csv", usecols = vars, dtype = vars_dtypes, sep = ";")
+df1.save(path + "df1_eolnprpickle")
+
+vars_dtypes = {"points_uncorrected" : np.float16 , "points" : np.float16 , 
+               "type" : np.int8 , "male" : np.int8 , "out_year" : np.int8 , "out_month" : np.int8 , 
+               "dead_year" : np.int8 , "dead_month" : np.int8 , "out_to" : np.int8}
+vars = vars_dtypes.keys()
+df2 = pd.read_csv(path + "eolnprreducedv2.csv", usecols = vars, dtype = vars_dtypes, sep = ";")
+df2.save(path + "df2_eolnprpickle")
+
+
+df1 = pd.load(path + "df1_eolnprpickle")
+df2 = pd.load(path + "df1_eolnprpickle")
+df1 = df1.join(df2)
+
+df = pd.read_csv(path + "eolnprreducedv2.csv", usecols = vars, dtype = vars_dtypes, sep = ";")
+
+vars_dtypes = {"days" : np.int16}
+
+vars_dtypes = [("id" , np.int16 ), ( "birth_year" , np.int8 ), ("days" , np.int16), ( "mdg" , np.int8 ), ( 
+               "threshold" , np.int8 ), ( "surgery" , np.int8 ), ( "points_uncorrected" , np.float16 ), ( "points" , np.float16 ), ( 
+               "type" , np.int8 ), ( "male" , np.int8 ), ( "out_year" , np.int16 ), ( "out_month" , np.int8 ), ( 
+               "dead_year" , np.int8 ), ( "dead_month" , np.int8 ), ( "out_to" , np.int8)]
+y_np = np.loadtxt(path +"eolnprreducedv2.csv", dtype=vars_dtypes, delimiter=';', skiprows=1)
+
+
+
+vars = ["id"]
+df = pd.read_csv(path + "eolnprreducedv2.csv", usecols = vars, dtype = vars_dtypes, sep = ";")
+
+df = pd.read_csv(path + "eolnprreducedv2.csv", usecols = vars, nrows= 5000, sep = ";")
+
+"drg" : np.object , "icd10" : np.object
+
+df["age_dead"]=df.birth_year - df.dead_year
+
+sm.iolib.foreign.StataReader
+
+
+import statsmodels.iolib.foreign as smio
+from pandas import DataFrame
+arr = smio.genfromdta('~/path/to/stata/data.dta')
+frame = DataFrame.from_records(arr)
+
+
+
+statsmodels.iolib.foreign.StataReader(fname, missing_values=False, encoding=None)[source]
+
+    ipc_data_handle = open('/Users/dan/Desktop/researchtmp/pat76_06_ipc.dta')
+    ipc_data = StataReader(ipc_data_handle)
+
+
+statsmodels.iolib.foreign.genfromdta(fname, missing_flt=-999.0, encoding=None, pandas=False, convert_dates=True)[source]?
+
+#iter_csv = pd.read_csv(path + "eolnpr2008.csv", sep = "@", na_values=["*" , "." , " "])
+id_vars = ["id", "sex", "birth_year"]
+
+df_id = pd.read_csv(path + "eolnpr2009v3.csv", usecols = id_vars)
+#df_id = df_id.drop_duplicates()
+#df_id = df_id.set_index("id")
+
+vars = event_vars1 + event_vars2 + event_vars3
+vars = vars + id_vars
+
+df = pd.read_csv(path + "eolnpr2009v3.csv", usecols = vars, nrows=1000)
+
+
+event_vars1 = ['mdg', 'threshold', 'points_not_corrected', 'points']
+event_vars2 = ['type', 'drg', 'out_month', 'category']
+event_vars3 = ['icd10', 'dead_year', 'dead_month'] 
+
+df_event1 = pd.read_csv(path + "eolnpr2009v3.csv", usecols = event_vars1)
+
+var_dtypes1 {'mdg':int, 'threshold':int, 'points_not_corrected':float, 'points':float}
+
+df_event1 = pd.read_csv(path + "eolnpr2009v3.csv", usecols = event_vars1)
+df_event2 = pd.read_csv(path + "eolnpr2009v3.csv", usecols = event_vars2)
+df_event3 = pd.read_csv(path + "eolnpr2009v3.csv", usecols = event_vars3)
+
+
+
+
+vars = event_vars1 + event_vars2 + event_vars3
+
+
+
+df = pd.read_csv(path + "eolnpr2009v3.csv", usecols = ["id", "sex"])
+for var in vars:
+    new_column = pd.read_csv(path + "eolnpr2009v3.csv", usecols = [var], squeeze = True)
+    print var
+    df[var] = new_column.values
+    del new_column
+ 
+df["drg"]
+df["dead_month"]
+
+df_event1 = pd.read_csv(path + "eolnpr2009v3.csv", usecols = event_vars1, index_col= 'id')
+df_event2 = pd.read_csv(path + "eolnpr2009v3.csv", usecols = event_vars2, index_col= 'id')
+df_event3 = pd.read_csv(path + "eolnpr2009v3.csv", usecols = event_vars3, index_col= 'id')
+df_id.index
+df_event1.index
+
+df_id = df_id.drop_duplicates()
+
+
+df_id.join([df_event1, df_event2, df_event3])
+
+df_id.join(df_event1, df_event2, df_event3], how = "left")
+df_id.append(df_event1)
+df= pd.merge([df_id, df_event1], left_index= True, right_index=True)
+
+
+
+
+iter_csv = pd.read_csv(path + "eolnpr2009v3.csv", iterator = True, chunksize = 1000)
+df = pd.concat([chunk for chunk in iter_csv], ignore_index=True)
+
+
+import pandas, re, numpy as np
+
+def load_file(filename, num_cols, delimiter=','):
+    data = None
+    try:
+        data = np.load(filename + '.npy')
+    except:
+        splitter = re.compile(delimiter)
+
+        def items(infile):
+            for line in infile:
+                for item in splitter.split(line):
+                    yield item
+
+        with open(filename, 'r') as infile:
+            data = np.fromiter(items(infile), float64, -1)
+            data = data.reshape((-1, num_cols))
+            np.save(filename, data)
+
+    return pandas.DataFrame(data)
+
+df = load_file(path + "eolnpr2009v4.txt", 16, delimiter = ",")
+
+5783782
+
+
+tp = read_csv('exp4326.csv', iterator=True, chunksize=1000)
+df = concat([chunk for chunk in tp], ignore_index=True)
+
+iter_csv = pandas.read_csv('file.csv', iterator=True, chunksize=1000)
+df = pd.concat([chunk for chunk in iter_csv])
+
+df = pd.read_csv(path + "eol_npr.csv", sep = "@", na_values=["*" , "." , " "])
+
+df = pd.read_csv(r"E:\data\npr2008\original\npr2008longv2.csv")
+df = df.rename(columns={'mdg': 'mdc'})
+
+icd = pd.read_csv(r"E:\data\npr2008\original\icd2008v2.txt", sep ="@")
+icd_dict = dict(zip(icd["icdcode"][:],icd["icdtext"][:]))
+
+
+mdc = pd.read_csv(r"E:\data\python\hdg5.csv", sep =";", header=None, encoding = "cp1252", names=["mdc_code", "mdc_text"])
+mdc = pd.read_csv(r"E:\data\python\mdclabels.csv", sep =";", header=None, names=["mdc_code", "mdc_text"])
+
+mdc_dict = dict(zip(mdc["mdc_code"][:],mdc["mdc_text"][:]))
+mdc_dict
+print mdc_dict
+print mdc_dict[18]
+
+df2 = pd.read_csv(r"F:\data\endoflifev2csv.csv", sep ="@", nrows=500000, na_values=["*", "."])
+df2 = pd.read_csv(r"F:\data\endoflifev2csv.csv", sep ="@", na_values=["*", "."])
+# just checking
+
+df2[:10]
+df2["drg"]
+df2["sex"]
+df2["icd"]
+df2["outdate"]
+df2.columns
+
+df2[3]
+df2
+
+print icd.types
+print icd.columns
+icd[:10]
+icd["A000"]
+icd[6]
+icd["icdcode"][:25]
+icd["icdcode"][5]
+icd_dic["A000"]
+
+print df.dtypes
+print df.columns
+
+df["days"][10]
+df["days"][:10]
+df["drg"][:10]
+
+# frequencies 
+mdc_counts = DataFrame(df['mdc'].value_counts())
+mdc_counts = df['mdc'].value_counts()
+mdc_counts[:30]
+mdc_counts
+mdc_counts
+
+print mdc_counts2
+print mdc_dict
+print mdc
+mdc_dict2 = Series(mdc_dict)
+mdc_counts2 = DataFrame(mdc_counts)
+# Merging
+mdc_counts2.index.name = "mdc_code"
+mdc_dict2.index.name = "mdc_code"
+mdc_counts2 = mdc_counts2.reset_index()
+mdc_counts = mdc_counts.reset_index()
+
+mdc.reset_index()
+mdc_counts2.columns
+mdc.columns
+mdc_counts2 = mdc_counts2.rename(columns={'index': 'mdc_code'})
+mdc_counts = mdc_counts.rename(columns={'index': 'mdc_code'})
+mdc.dtypes
+mdc_counts.dtypes
+
+dfWithText = pd.merge(mdc_counts2, mdc, left_index=True, right_index=True)
+dfWithText = pd.merge(mdc_counts, mdc, left_on="mdc_code", right_on="mdc_code")
+print dfWithText
+mdc_counts["mdc_code"][22]==98
+
+pd.merge(mdc_counts, mdc)
+
+
+
+drg_counts = df['drg'].value_counts()
+drg_counts[:50]
+
+icd_counts = df['icd10'].value_counts()
+icd_counts[:50] 
+print icd_counts
+type(icd_counts)
+icd_counts.join(icd_dict, on="icd")
+
+
+# df.groupby("id")
+
+print df.ix[-20:, :12].to_string()
+
+# Do patients come back year after year?
+# Take those who are patients in 2008. List by id. Examine if same id in 2009 and 2010
+# need: list of id, function which returns one id that 1 has a visit in a year
+# circle three years (or list)
+
+frame = DataFrame(df2)
+
+len(df2)
+
+def get_ids(look_for, look_in):
+    "id"+lookfor = set(v for v in id if look_for == look_in)
+   
+#variable to look for
+#object to look in (a column, a database)
+#name of set should be id+variable
+
+
+
+id2008=list()
+for v in range(len(df2)):
+        if "2008" in df2.outdate[v]:
+               id2008.append(df2.id[v])
+id2008=set(id2008)
+
+id2009=list()
+for v in range(len(df2)):
+        if "2009" in df2.outdate[v]:
+               id2009.append(df2.id[v])
+id2009=set(id2009)
+
+id2010=set()
+for v in range(len(df2)):
+        if "2010" in df2.outdate[v]:
+               id2010.append(df2.id[v])
+
+
+id2010=set(id2010)
+
+overlap ={}
+for v in id2008:
+    overlap[v]=0
+    if v in id2009:
+        overlap[v]=1
+    if v in id2010:
+        overlap[v]=2
+    if v in id2009 and v in id2010:
+        overlap[v]=3
+len(overlap)
+Counter(overlap.values())
+c= Counter(overlap.values())
+sum(c.values())
+
+c= Counter(overlap.values())
+s= sum(c.values())
+
+result = list(c.values)
+
+
+OverlapTable= list[v/len(overlap) for v in Counter(overlap.values())]
+OverlapTable
+
+overlap2008and2009=set.intersection(id2008, id2009)
+# overlap2008and2010= id2008 and id2010
+overlap2008and2009and2010=set.intersection(id2008, id2009, id2010)
+# in general, create a function that pics out sets of ids of people who satisfy a certain criterion (one or more variable equal to) 
+# well this is (almost) built in ?
+# not really, since here id, could use hierarchy, but still, better.
+# also organie things in several data frames and lists and so on
+# labels in one
+# individual information in another
+# one with all hospitalizatins
+
+
+
+
+
+len(overlap)
+len(overlap2008and2009)
+len(overlap2008and2009and2010)
+
+results=overlap.values
+results
+
+
+
+
+len(id2008)
+id2008=set(id2008)
+len(id2008)
+
+
+        
+
+
+df2[:5]
+df2.column
+
+
+df2.outdate
+
+
+id2008=[v for v in df2["id"].values if "2008" in df2["outdate"][v]]
+id2008 = df2["outyear" if "2008" in df2.outyear]
+
+id2008 = set[df2["id"].values for v in df2 if "2008" in df2.outdate]
+
+"2008" in df2.outyear
+
+"2008" in df2["outdate"]
+
+"2009" in df2["outdate"][253]
+
+
+df2.columns
+frame
+df2
+
+# cost of dying analysis
+df
+df.head(10)
+df.points[df.points < 0] = np.nan
+df.out_year[df.out_year < 0] = np.nan
+groups = ["out_year", "id", "birth_year", "male"]
+grouped = df.groupby(groups)
+grouped["points"].aggregate(np.average)
+df["points_sum"]= df.groupby(groups)["points"].transform(np.sum)
+
+
+df.points[df.points < 0] = np.nan
+df.out_year[df.out_year < 0] = np.nan
+
+
+df["points"].groupby(groups)
